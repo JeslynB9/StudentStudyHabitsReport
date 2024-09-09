@@ -1,0 +1,572 @@
+---
+title: "Analysing the Impact of Study Hours, Work Status, and Gender on Academic Performance"
+date: "today"
+date-format: "DD MMMM, YYYY"
+author: "530481526"
+format: 
+  html:
+    theme: minty
+    embed-resources: true
+    code-fold: true
+    code-tools: true
+    table-of-contents: true
+    number-sections: true
+    references: true
+bibliography: report.bib
+---
+
+```{r}
+#| message: false
+library(tidyverse)
+library(dplyr)
+library(gendercoder)
+library(ggplot2)
+library(janitor)
+library(patchwork)
+library(ggpubr)
+theme_set(theme_bw())
+data = readxl::read_excel("survey_2024_Responses.xlsx")
+```
+
+# Introduction
+
+In a recent survey [@survey] conducted among students, taught by Professor Garth Tarr, a detailed exploration of academic and personal attributes was undertaken. The dataset, comprising responses from 313 students, provides a snapshot of their academic ambitions, with goals ranging from Pass to High Distinction. The survey also delves into students' study habits, revealing varying approaches from planned schedules to last minute efforts as well as Lifestyle factors such as dietary preferences and personal interests.
+
+Academic performance is a multifaceted outcome influenced by various personal, social, and institutional factors. Among these, study habits, work commitments, and gender have garnered considerable attention for their potential impact on a student's Weighted Average Mark (WAM). Understanding the relationship between these factors and academic success is essential for educators, policymakers, and students alike to develop effective strategies for improving performance and balancing responsibilities.
+
+In this report we are concerned with the three following questions:
+
+-   First, if there is an association between the number of hours spent studying per week and students’ work status.
+
+-   Second, if there is a significant difference in WAM between students who work and those who do not.
+
+-   Finally, if the average number of hours spent studying differ by gender.
+
+This report aims to explore the effects of study hours, work status, and gender on students' academic performance. Specifically, it investigates whether students who work tend to have lower WAMs than those who do not, and whether gender differences exist in study habits. By analysing the survey data from students, this report seeks to provide insights into how these variables interact and contribute to overall academic success. In doing so, the study sheds light on the challenges students face in balancing work and study, as well as any potential gender disparities in educational outcomes.
+
+## Is this a Random Sample of Students?
+
+### Characteristics of a Random Sample {.unnumbered}
+
+-   **Equal Probability:** In a truly random sample, every student would have an equal chance of being selected to take the survey.
+-   **Random Selection Method:** Selection is typically conducted using a method that ensures randomness, such as random number generation and other techniques that do not introduce bias.
+
+### Characteristics of the Current Sample {.unnumbered}
+
+-   **Voluntary Selection:** Because students opted in rather than being randomly selected, the process does not ensure that every student had an equal chance of being included in the sample. This lack of randomisation means the sample may not accurately reflect the full population of students.
+
+Given that the survey was voluntary and offered no incentive for participation, the resulting sample is not a random sample of students. This self-selection method may introduce biases, as the respondent might have particular motivations or characteristics that are not representative of the entire class. While the sample provides valuable insights, the findings should be interpreted with the understanding that they may not fully reflect the experiences of all students.
+
+## What are the Potential Biases? Which Variables are Most Likely to be Subjected to this Bias?
+
+-   **Self-Selection Bias** [@selectionbias]:
+    -   Participants chose to do the survey voluntarily, this leads to a sample that may not be representative of all the students.
+    -   **Variables Affected:**
+        -   "What final grade are you aiming to achieve?"
+        -   "What is your WAM (weight average mark)?"
+        -   "How many hours a week do you spend studying?"
+        -   "Do you submit assignments on time?"
+        -   "How much alcohol do you consume each week?"
+        -   "How much time do you spend on short video apps (like tiktok or reels) every day?"
+-   **Motivational Bias** [@motivationbias]:
+    -   Students who are more motivated or interested in the survey topic may be more likely to participate, potentially skewing results.
+    -   **Variables Affected:**
+        -   "How many hours a week do you spend studying?"
+        -   "Do you submit assignments on time?"
+        -   "How often would you say you feel anxious on a daily basis?"
+        -   "Do you believe in the existence of aliens (Extraterrestrial Life)?"
+-   **Response Bias** [@responsebias]:
+    -   Participants might provide answers they believe are desirable or reflective of their self-perception rather than their actual situation.
+    -   **Variables Affected:**
+        -   "How much alcohol do you consume each week?"
+        -   "How much time do you spend on short video apps (like tiktok or reels) every day?"
+        -   "How many hours a week do you spend studying?"
+        -   "Do you submit assignments on time?"
+-   **Demographic Bias** [@demographicbias]:
+    -   Certain demographic groups might be over-represented or under-represented in the sample.
+    -   **Variables Affected:**
+        -   "How old are you?"
+        -   "What is your gender?"
+        -   "How many siblings do you have?"
+        -   "What is your shoe size?"
+
+## Which Questions Needed Improvement to Generate Useful Data?
+
+-   **How tall are you?**: This question needs some improvement, as we can see from the data the units and methods of answering are varied which creates a lot of work in terms of data cleaning and extracting insights. To improve this question we could ask: "What is your height in centimeters?"
+
+-   **How much time do you spend on short video apps (like tiktok or reels) every day?**: This question similar to the above question has many varying units in the answers. A way to improve this question would be to specify units that should be used, we could ask: "How many hours do you spend on short video apps (like tiktok or reels) every day?"
+
+-   **How much sleep do you get (on avg, per day)?**: Similar to the above, this question would benefit from the unit being specified. Instead, we could ask: "How many hours of sleep do you get (on avg, per day)?"
+
+-   **What is your show size?**: This question creates a lot of work when cleaning the data, it would be improved by adding a specific shoe size metric. Here an improved way to ask this question: "What is your show size (in AU sizing)?"
+
+-   **What is your gender?**: This question could be improved by making it multiple choice with five options:
+
+    -   'Man or male',
+    -   'Woman or female',
+    -   'Non-binary',
+    -   'Prefer not to answer', and
+    -   '\[I/they\] use a different term (please specify)' [@absgender]
+
+    However, there will be a specification box where those who selected the fourth option can provide their preferred gender.
+
+# Data Wrangling
+
+The calculations in this report were performed in R [@baser] within the Quarto [@quartodoc] environment for reproducibility. Data wrangling was done with base R and the tidyverse package [@tidyverse]. Graphs were created using ggplot2 [@ggplot2], ggpubr [@ggpubr] and combined with patchwork [@patchwork]. Some tables were made with the janitor package [@janitor] and knitr [@knitr].
+
+Variable names were simplified and shortened [@garthcleaning]. Columns that are not relevant were removed, we retain four columns: 'Work Status', 'WAM', 'Weekly Study Hours' and 'Gender'. Missing values were not removed at this stage but will be handled on a case-by-case basis in order to retain as much data as possible.
+
+```{r}
+oldnames = colnames(data)
+newnames = c(
+  "timestamp",
+  "target_grade",
+  "assignment_preference",
+  "trimester_or_semester",
+  "age",
+  "tendency_yes_or_no",
+  "pay_rent",
+  "urinal_choice",
+  "stall_choice",
+  "weetbix_count",
+  "weekly_food_spend",
+  "living_arrangements",
+  "weekly_alcohol",
+  "believe_in_aliens",
+  "height",
+  "commute",
+  "daily_anxiety_frequency",
+  "weekly_study_hours",
+  "work_status",
+  "social_media",
+  "gender",
+  "average_daily_sleep",
+  "usual_bedtime",
+  "sleep_schedule",
+  "sibling_count",
+  "allergy_count",
+  "diet_style",
+  "random_number",
+  "favourite_number",
+  "favourite_letter",
+  "drivers_license",
+  "relationship_status",
+  "daily_short_video_time",
+  "computer_os",
+  "steak_preference",
+  "dominant_hand",
+  "weekly_exercise_hours",
+  "weekly_paid_work_hours",
+  "assignments_on_time",
+  "used_r_before",
+  "team_role_type",
+  "university_year",
+  "favourite_anime",
+  "fluent_languages",
+  "readable_languages",
+  "country_of_birth",
+  "wam",
+  "shoe_size")
+# overwrite the old names with the new names
+colnames(data) = newnames
+# combine old and new into a data frame
+name_combo = bind_cols(New = newnames, Old = oldnames)
+
+# Removing columns that are not related
+data <- data %>%
+  select(work_status, wam, weekly_study_hours, gender)
+
+```
+
+# Results
+
+## Is There an Association Between the Number of Hours Spent Studying per Week and Students’ Work Status?
+
+The stacked bar chart in @fig-study_work visually represents the number of observations across three categories of study hours: 'Low', 'Medium', and 'High'. The graph distinguishes between two groups: those who do not work and those who work.
+
+The graph shows that individuals who do not work are more likely to have low study hours, while both groups have fewer individuals as study hours increase. This suggests a potential relationship between work status and study time allocation. To test this formally, we will be using the chi-squared test of independence.
+
+### Data Wrangling
+
+In order to complete these calculations and come to a conclusion, we need to ensure that the data is comparable.
+
+One important step to the data wrangling would be ensuring that all answers are within the range of allowed values. In this case, the range of allowed values would be from 0 to 168, since there are only 168 hours in a week.
+
+The next step is considering null values. Fortunately, there are no null values in the weekly study hours column. However, there were some in the work status, column. These null values were all filtered out.
+
+To do the chi-squared test of independence, the study hours were categorised into bins low (0-20 hours), medium (21-39 hours) and high (40+ hours), these ranges were inspired by the recommended study hours by The University of Sydney [@usydtime]. This was done to simply the analysis and helps better understand the distribution of study habits among students with different work status.
+
+### Exploratory Data Analysis
+
+```{r fig-study_work, warning=FALSE, message=FALSE, fig.cap= "Distribution of Weekly Study Hours by Work Status"}
+#| message: false
+#| echo: false
+#| result: false
+
+# Filter out rows where weekly_study_hours > 168 or work_status is NA
+filtered_study <- filter(data, weekly_study_hours >= 0 & weekly_study_hours <= 168 & !is.na(work_status))
+
+# Check if there are any NA values in weekly_study_hours column
+na <- any(is.na(filtered_study$weekly_study_hours))
+na <- any(is.na(filtered_study$work_status))
+
+# Low: <= 20, Medium: 20-40, High: >= 40
+bins <- c(-Inf, 20, 40, Inf)
+
+# Convert to bins
+study_hours_binned <- cut(filtered_study$weekly_study_hours, breaks = bins, labels = c("Low", "Medium", "High"), 
+                          include.lowest = TRUE)
+
+# Recode work_status
+work_status <- filtered_study$work_status
+
+
+recode_work_status <- ifelse(work_status %in% c("Casual", "Part time", "Self employed"), "Work", "Don't Work")
+
+# Create contingency table
+contingency_table <- table(study_hours_binned, recode_work_status)
+
+contingency_df <- as.data.frame(contingency_table)
+
+# Make contingency table into a bar plot
+study_work <- ggplot(contingency_df, aes(x = study_hours_binned, y = Freq, fill = recode_work_status)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Distribution of Study Hours by Work Status",
+       x = "Study Hours",
+       y = "Number of Students") +
+  theme_minimal() +
+  scale_fill_manual("Work Status", values = c("Don't Work" = "lightgoldenrod1", "Work" = "mediumpurple")) +
+  scale_y_continuous(breaks = seq(0, 168, by = 20))
+
+study_work
+```
+
+### Chi-Squared Test of Independence
+
+```{r}
+# Calculate expected counts
+expected_counts <- chisq.test(contingency_table)$expected
+# Perform Chi-squared test
+chi_test <- chisq.test(contingency_table)
+```
+
+1.  **Hypothesis:**
+
+-   $H_0$: There is no association between the number of hours spent studying per week and students' work status.
+-   $H_1$: There is an association between the number of hours spent studying per week and students' work status.
+
+2.  **Assumptions:**
+
+-   Each observation should be independent of each other. This means the response from one participant should not affect the response from another participant.
+-   None of the expected cell counts are below 5.
+-   Both variables must be categorical.
+
+3.  **Test Statistic:** $X^2_2=\sum^k_i{\frac{(Y_i - e_i)^2}{e_i}}$
+
+4.  **Observed Test Statistic:** $t_0$ = `r round(chi_test$statistic, 3)`
+
+5.  **P-value:** $P(X^2_2 \geq$ `r round(chi_test$statistic, 3)` $)$ = `r round(chi_test$p.value, 3)`
+
+6.  **Decision:** Since the p-value is less than the significance level of 0.05, we will reject the null hypothesis. This suggests that there is statistically significant evidence to conclude that study hours and work status are not independent, indicating an association between them.
+
+## Is There a Significant Difference in WAM Between Students who Work and Those Who Do Not?
+
+@fig-wam illustrates the distribution of WAM among students based on two groups: those who “Don’t Work” and those who “Work”. The horizontal axis represents WAM scores ranging from 0 to 100, while the vertical axis represents the density, ranging from 0 to 0.045. Both groups have similar distributions but individuals who works peak at approximately 80, while individuals who do not work peak at approximately 75. This distribution provides insights into how work status might influence academic performance, with working individuals potentially achieving higher WAM scores on average.
+
+### Data Wrangling
+
+In order to prepare for this test, all entries that were less than 0 and greater than 100 were removed the since WAM can only be between 0 and 100. Another important step is to check for null values in the data. In this case, there were no null values.
+
+To further proceed, all students that answered with 'Casual', 'Part time' and 'Self employed' were all categorised together under 'Work'. We also need to check if there are null values in this column. Null values were found and were promptly removed to ensure all calculations and visualisations are appropriate.
+
+### Exploratory Data Analysis
+
+```{r fig-wam, warning=FALSE, message=FALSE, fig.cap= "Density Plot of WAM by Work Status"}
+# Filter wam <= 100
+filtered_wam <- filter(filtered_study, wam >= 0 & wam <= 100)
+filtered_wam <- filter(filtered_wam, !is.na(work_status))
+work_status_wam <- filtered_wam$work_status
+
+# Checking if any null values in the wam column
+na <- any(is.na(filtered_wam$wam))
+null <- any(is.null(filtered_wam$wam))
+
+# Checking if any null values in the wam column
+na <- any(is.na(filtered_wam$work_status))
+null <- any(is.null(filtered_wam$work_status))
+
+# Add recode_work_status_wam to filtered_wam
+filtered_wam$recode_work_status_wam <- ifelse(filtered_wam$work_status %in% c("Casual", "Part time", "Self employed"), "Work", "Don't Work")
+
+
+# Make a WAM density plot to see if we can use Wilcoxon rank_sum
+wam_density <- ggplot(filtered_wam, aes(x = wam, fill = recode_work_status_wam)) +
+  geom_density(alpha = 0.5) +  
+  scale_fill_manual("Work Status", values = c("Don't Work" = "lightgoldenrod1", "Work" = "mediumpurple")) +
+  labs(x = "WAM", y = "Density", title = "Density of WAM by Work Status") +
+  theme_minimal() +
+  scale_x_continuous(breaks = seq(0, 100, by = 10)) +
+  scale_y_continuous(breaks = seq(0, 0.045, by = 0.005))
+
+wam_density
+```
+
+```{r include=FALSE}
+# Histogram
+# wam_hist <- ggplot(filtered_wam, aes(x = wam, fill = recode_work_status_wam)) +
+#   geom_histogram(position="dodge", binwidth = 10) +
+#   scale_fill_manual("Work Status", values = c("Don't Work" = "lightgoldenrod1", "Work" = "mediumpurple")) +
+#   labs(x = "WAM", y = "Frequency", title = "Histogram of WAM by Work Status") +
+#   scale_x_continuous(breaks = seq(0, 100, by = 10))
+
+# wam_hist
+```
+
+```{r fig-wam_2, warning=FALSE, message=FALSE, fig.cap= "Average WAM for both Work Status categories. Box plot showing relatively equal spread of WAM and Work Status with their respective Q-Q plots."}
+# Create a box plot to show the distribution of study hours by gender
+wam_box <- ggplot(filtered_wam, aes(x = recode_work_status_wam, y = wam, fill = recode_work_status_wam)) +
+  geom_boxplot() +
+  scale_fill_manual("Work Status", values = c("Don't Work" = "lightgoldenrod1", "Work" = "mediumpurple")) +
+  xlab("Work Status") +
+  ylab("WAM") +
+  theme_minimal() +
+  theme(legend.position = "right")
+
+# Create Q-Q plots for each work status
+wam_qq <- ggqqplot(filtered_wam, x="wam", facet.by="recode_work_status_wam")
+
+wam_box + wam_qq + plot_annotation(tag_levels = 'A')
+```
+
+```{r include=FALSE}
+# wam_qq <- ggplot(filtered_wam, aes(sample = wam)) +
+#   geom_qq(shape = 1) +
+#   geom_qq_line() +
+#   facet_wrap(~ recode_work_status_wam) +
+#   xlab("Theoretical Quantiles") +
+#   ylab("Sample Quantiles") +
+#   theme_minimal() +
+#   theme(legend.position = "none")
+```
+
+```{r}
+#| label: tbl-wam_summary
+#| tbl-cap: "Summary of WAM by Work Status"
+wam_table <- filtered_wam %>%
+  select(wam, recode_work_status_wam) %>%
+  group_by(recode_work_status_wam) %>%
+  summarise(
+    n = n(),
+    Mean = round(mean(wam, na.rm = TRUE), 2),
+    SD = round(sd(wam, na.rm = TRUE), 2),
+    variance = round(var(wam, na.rm=TRUE), 2)
+  ) %>%
+  rename(
+    "Work Status" = recode_work_status_wam,
+    "Number of Observations" = n,
+    "Average WAM" = Mean,
+    "Standard Deviation" = SD,
+    "Variance" = variance
+  )
+
+# Print the table
+knitr::kable(wam_table)
+```
+
+### Wilcoxon Rank-Sum Test
+
+```{r}
+# Splitting the working students and not working students
+dont_work_wam <- filtered_wam$wam[filtered_wam$recode_work_status_wam == "Don't Work"]
+work_wam <- filtered_wam$wam[filtered_wam$recode_work_status_wam == "Work"]
+
+# Perform Welch 2 sample
+t_test <- t.test(dont_work_wam, work_wam, alternative = 'less')
+
+# Wilcoxon rank-sum test
+wilcox_result <- wilcox.test(dont_work_wam, work_wam, alterative = 'less')
+```
+
+1.  **Hypothesis:**
+
+-   $H_0$: The distribution of WAMs is the same for students who work and those who do not work.
+-   $H_1$: The WAMs of students who work are lower than those of students who do not work.
+
+2.  **Assumptions:**
+
+-   Both work categories show some deviation from the normality line in the Q-Q plots on the right-hand side of @fig-wam_2, this indicates that the WAM does not follow a normal distribution for any of these groups. This is further supported by how the standard deviations in @tbl-wam_summary show that the variances are not roughly equal.
+-   Each observation should be independent of each other. This means that the response from one participant should not influence the response of anyone else.
+-   The variances should be unequal, this is true as in @tbl-wam_summary the difference between the variance of the 'Don't Work' and the 'Work' groups highly differs.
+-   The distribution of both groups follow the same distribution, however there is a slight location shift has seen in @fig-wam.
+
+3.  **Test Statistic:** $W = R_1 + R_2 + ... + R_{n_A}$
+
+4.  **Observed Test Statistic:** $t_0$ = `r wilcox_result$statistic`
+
+5.  **P-value:** $2P(W \geq w)$ = `r round(wilcox_result$p.value, 3)`
+
+6.  **Decision:** As the p-value is less than the significance level 0.05, we will reject the null hypothesis and conclude that the WAM of students who work are lower than the WAM of students who do not work. The Welch two sample t-test also comes to this conclusions with a p-value of `r round(t_test$p.value, 3)`.
+
+## Does the Average Number of Hours Spent Studying Differ by Gender?
+
+The box plot in @fig-study_gender visually compares the weekly study hours across three gender categories: 'man', 'woman', and 'NA'. Women have a slightly higher median study time than men, while men exhibit more variability in study hours. Outliers exist in each group, indicating individuals with significantly differ study habits. The 'NA' category has a median similar to women but with less variability. But to test this formally, we will be using a permutation test.
+
+### Data Wrangling
+
+In order to do a permutation test, the data needs to be reasonable. One thing that needs to be checked is the weekly study hours. All entries that were greater than 168, needs to be removed from the calculation since there are only 168 hours in the week, including weekends. Fortunately, there were no null values.
+
+Next, the gender columns needs to be categorised into 'Man', 'Woman' and 'NA'. The initial data cleaning was provided by Professor Tarr [@garthcleaning]. However, this categorises the genders into five columns, now including 'Girl' and 'Boy'. Further cleaning was done by combining 'Girl' with 'Woman' and 'Boy' with 'Man'. During this process it was found that there were three entries that were not categorised correctly. This was corrected by replacing the values before categorising the genders. To categorise the genders, GenderCoder [@gendercoder] was used.
+
+### Exploratory Data Analysis
+
+```{r fig-study_gender, warning=FALSE, message=FALSE, fig.cap= "Average study hours for all three gender categories. Box plot showing relatively equal spread of weekly study hours and gender with their respective Q-Q plots."}
+
+filtered_study$gender[filtered_study$gender == "Heterosexual Male"] <- "male"
+filtered_study$gender[filtered_study$gender == "Biological Female"] <- "female"
+filtered_study$gender[filtered_study$gender == "Not Female"] <- "male"
+
+# Removing 'boy' and 'girl' columns
+filtered_study <- filtered_study %>%
+  mutate(
+    gender_clean = gendercoder::recode_gender(gender, dictionary = fewlevels_en),
+    gender_clean = case_when(
+      gender_clean %in% c("boy") ~ "man",
+      gender_clean %in% c("girl") ~ "woman",
+      TRUE ~ gender_clean
+    )
+  )
+
+
+# Now replace NA values with "NA" string representation
+filtered_study <- filtered_study %>%
+  mutate(gender_clean = ifelse(is.na(gender_clean), "NA", as.character(gender_clean)))
+
+# Ensure the gender_clean column is a factor with levels including "NA"
+filtered_study$gender_clean <- factor(filtered_study$gender_clean, levels = c("man", "woman", "NA"))
+
+# Checking if any null values in the gender_clean column
+na <- any(is.na(filtered_wam$gender_clean))
+null <- any(is.null(filtered_wam$gender_clean))
+
+# Checking if any null values in the weekly_study_hours column
+na <- any(is.na(filtered_wam$weekly_study_hours))
+null <- any(is.null(filtered_wam$weekly_study_hours))
+
+# Create a box plot to show the distribution of study hours by gender
+study_plot <- ggplot(filtered_study, aes(x = gender_clean, y = weekly_study_hours, fill = gender_clean)) +
+  geom_boxplot() +
+  scale_fill_manual("Gender", values = c("man" = "lightblue", "woman" = "lightpink", "NA" = "lemonchiffon")) +
+  xlab("Gender") +
+  ylab("Weekly Study Hours") +
+  theme_minimal() +
+  theme(legend.position = "right")
+
+# Create Q-Q plots for each gender
+study_qq_plots <- ggqqplot(filtered_study, x="weekly_study_hours", facet.by="gender_clean")
+
+study_plot + study_qq_plots + plot_annotation(tag_levels = 'A')
+```
+
+```{r include=FALSE}
+filtered_study |>
+ janitor::tabyl(gender, gender_clean) |>
+ gt::gt() |>
+ gt::tab_spanner(label = "Recoded outcomes", columns = 2:3) |>
+ gt::cols_label(gender = "Original outcomes")
+```
+
+```{r}
+#| label: tbl-study_summary
+#| tbl-cap: "Summary of Weekly Study Hours by Gender"
+study_table = filtered_study %>% select(weekly_study_hours, gender_clean) %>% group_by(gender_clean) %>%
+  summarise(n = n(),
+             Mean = round(mean(weekly_study_hours, na.rm = TRUE), 2),
+            SD = round(sd(weekly_study_hours, na.rm = TRUE), 2),
+            variance = round(var(weekly_study_hours, na.rm=TRUE), 2)
+            )
+study_table <- study_table %>%
+  rename(
+    "Gender" = gender_clean,
+    "Number of Observations" = n,
+    "Average Hours" = Mean,
+    "Standard Deviation" = SD,
+    "Variance" = variance
+  )
+
+knitr::kable(study_table)
+```
+
+### Permutation Testing
+
+```{r}
+# Set the seed
+set.seed(123)
+# Function to calculate test statistic
+calculate_stat <- function(data) {
+  group_means <- data %>% 
+    group_by(gender_clean) %>%
+    summarise(mean_study_hours = mean(weekly_study_hours, na.rm = TRUE)) %>%
+    pull(mean_study_hours)
+  max(group_means) - min(group_means)
+}
+
+# Observed statistic
+observed_stat <- calculate_stat(filtered_study)
+
+# Set the number of permutations
+n_permutations <- 10000
+
+# Initialize a vector to store permutation statistics
+perm_stats <- numeric(n_permutations)
+
+# Perform permutations
+for (i in 1:n_permutations) {
+  permuted_data <- filtered_study %>%
+    mutate(gender_clean = sample(gender_clean))
+  perm_stats[i] <- calculate_stat(permuted_data)
+}
+
+# Calculate p-value
+p_value <- mean(abs(perm_stats) >= abs(observed_stat))
+```
+
+```{r include=FALSE}
+# Filter data to include only two levels of gender_clean
+filtered_study_two_levels <- filtered_study %>%
+  filter(gender_clean %in% c("man", "woman"))
+
+# Perform Welch's two-sample t-test
+welch_test <- t.test(weekly_study_hours ~ gender_clean, data = filtered_study_two_levels, var.equal = FALSE)
+
+# Print the results
+welch_test
+```
+
+1.  **Hypothesis:**
+
+-   $H_0$: There is no significant difference in the average hours spent studying between genders.
+-   $H_1$: There is a significant difference in the average hours spent studying between genders.
+
+2.  **Assumptions:**
+
+-   All three gender categories show some degree of deviation from the normality line in the Q-Q plots @fig-study_gender, this indicates that the weekly study hours does not follow a normal distribution for any of these groups. This is further supported by how the standard deviations in @tbl-study_summary show that the variances are not roughly equal.
+-   Each observation should be independent of each other. This means that the response from one participant should not influence the response of anyone else.
+-   Under the null hypothesis, the study hours for men, women and NA should be exchangeable, meaning the gender labels can be shuffled without affecting the overall distribution of study hours.
+
+3.  **Test Statistic:** $$
+    T = max(mean_{group1}, mean_{group2}, ...) - min(mean_{group1}, mean_{group2}, ...)
+    $$ where $mean_{group1}$ and $mean_{group2}$ are the means of the study hours for each group
+
+4.  **Observed Test Statistic:** $t_0$ = `r signif(observed_stat, 3)`
+
+5.  **P-value:** $\frac{Number of Permuted Test Statistics \geq Observed Test Statistic}{Total Number of Permuatations}$ = `r signif(p_value, 3)`
+
+6.  **Decision:** Since the p-value is greater than the significance level of 0.05, we will fail to reject the null hypothesis and conclude that there is no significant difference in the average hours spent studying between genders. The Welch two sample t-test also comes to the same conclusion with a p-value of `r round(welch_test$p.value, 3)`
+
+# Conclusion
+
+The chi-squared test indicated a significant association between study hours and work status, with non-working students tending to study more compared to their working counterparts. The Wilcoxon rank-sum test demonstrate a significant difference in WAM between working and non-working students, with working students exhibiting varied WAM score compared to their non-working peers. The permutation test suggested that gender does not significantly impact the average number of study hours, although variability exists within gender categories.
+
+These finding showcase the importance of considering work status when analysing academic performance and suggest that while gender may not directly influence study hours, individual differences persist. Given the potential biases and limitations identified in the sampling and data collection process, these results should be interpreted with caution, recognizing that the voluntary nature of the survey may not filly represent the entire student population.
+
+# References
